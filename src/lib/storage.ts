@@ -2,12 +2,13 @@ import { Agent, AppSettings, Message, ScheduledRoutine, VirtualFile } from '../t
 import { INITIAL_AGENTS, INITIAL_FILES, INITIAL_MESSAGES, INITIAL_SCHEDULED_ROUTINES } from './initialAgents';
 
 const STORAGE_KEYS = {
-  AGENTS: 'qubot_agents_v2',
-  MESSAGES: 'qubot_messages_v2',
-  ROUTINES: 'qubot_routines_v2',
-  FILES: 'qubot_files_v2',
-  SETTINGS: 'qubot_settings_v2',
-  CURRENT_AGENT_ID: 'qubot_active_agent_id'
+  AGENTS: 'qubot_agents_v3',
+  MESSAGES: 'qubot_messages_v3',
+  ROUTINES: 'qubot_routines_v3',
+  FILES: 'qubot_files_v3',
+  SETTINGS: 'qubot_settings_v3',
+  CURRENT_AGENT_ID: 'qubot_active_agent_id_v3',
+  MIGRATION_CLEANED: 'qubot_cleaned_dummy_v3'
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -22,11 +23,67 @@ export const DEFAULT_SETTINGS: AppSettings = {
   vmRuntime: 'podman',
   theme: 'white-glass',
   soundEffects: true,
-  autoSpeakResponses: false
+  autoSpeakResponses: false,
+  userProfile: {
+    name: 'Workspace Owner',
+    email: 'user@qubot.ai',
+    role: 'Workspace Administrator',
+    avatarUrl: ''
+  },
+  workspaceName: 'QUBOT Studio',
+  themeAccent: 'sky',
+  glassFrosting: 'standard',
+  aiAccounts: {
+    openai: { connected: false },
+    anthropic: { connected: false },
+    google: { connected: false },
+    grok: { connected: false },
+    deepseek: { connected: false },
+    hermes: { connected: false },
+    opencode: { connected: false },
+    openrouter: { connected: false },
+    ninerouter: { connected: false }
+  },
+  customModel: {
+    baseUrl: 'https://api.openai.com/v1',
+    modelName: 'gpt-4o',
+    apiKey: '',
+    isActive: false
+  },
+  hermesApiKey: '',
+  openCodeApiKey: '',
+  openRouterApiKey: '',
+  nineRouterApiKey: '',
+  customEndpoint: 'http://localhost:11434/v1',
+  ollamaModel: 'llama3:latest',
+  multiAgent: {
+    enableDelegation: true,
+    maxHops: 3,
+    autoSuggest: true
+  },
+  vpsServerUrl: 'http://localhost:3000',
+  vpsWebhookUrl: 'http://localhost:3000/api/webhook'
 };
+
+// Clean legacy dummy storage once
+function ensureCleanSlate() {
+  try {
+    if (typeof window !== 'undefined' && !localStorage.getItem(STORAGE_KEYS.MIGRATION_CLEANED)) {
+      // Remove any old v1/v2 dummy data
+      localStorage.removeItem('qubot_agents_v2');
+      localStorage.removeItem('qubot_messages_v2');
+      localStorage.removeItem('qubot_routines_v2');
+      localStorage.removeItem('qubot_active_agent_id');
+      localStorage.setItem(STORAGE_KEYS.MIGRATION_CLEANED, 'true');
+    }
+  } catch {
+    // Ignore in non-browser env
+  }
+}
 
 export function getStoredAgents(): Agent[] {
   try {
+    ensureCleanSlate();
     const data = localStorage.getItem(STORAGE_KEYS.AGENTS);
     return data ? JSON.parse(data) : INITIAL_AGENTS;
   } catch {
@@ -39,6 +96,27 @@ export function saveStoredAgents(agents: Agent[]) {
     localStorage.setItem(STORAGE_KEYS.AGENTS, JSON.stringify(agents));
   } catch (err) {
     console.error('Failed to save agents to localStorage', err);
+  }
+}
+
+export function deleteStoredAgent(agentId: string) {
+  try {
+    const agents = getStoredAgents().filter(a => a.id !== agentId);
+    saveStoredAgents(agents);
+    const messages = getStoredMessages();
+    delete messages[agentId];
+    saveStoredMessages(messages);
+  } catch (err) {
+    console.error('Failed to delete agent', err);
+  }
+}
+
+export function clearAllStoredAgents() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.AGENTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify({}));
+  } catch (err) {
+    console.error('Failed to clear agents', err);
   }
 }
 
@@ -96,7 +174,28 @@ export function saveStoredFiles(files: VirtualFile[]) {
 export function getStoredSettings(): AppSettings {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    return data ? { ...DEFAULT_SETTINGS, ...JSON.parse(data) } : DEFAULT_SETTINGS;
+    if (!data) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(data);
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      userProfile: {
+        ...DEFAULT_SETTINGS.userProfile,
+        ...(parsed.userProfile || {})
+      },
+      aiAccounts: {
+        ...DEFAULT_SETTINGS.aiAccounts,
+        ...(parsed.aiAccounts || {})
+      },
+      customModel: {
+        ...DEFAULT_SETTINGS.customModel,
+        ...(parsed.customModel || {})
+      },
+      multiAgent: {
+        ...DEFAULT_SETTINGS.multiAgent,
+        ...(parsed.multiAgent || {})
+      }
+    };
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -113,7 +212,7 @@ export function saveStoredSettings(settings: AppSettings) {
 export function exportBackupData(): string {
   const data = {
     appName: 'QUBOT - Automation Assistant for Everything',
-    version: '2.4.0',
+    version: '3.0.0',
     exportedAt: new Date().toISOString(),
     agents: getStoredAgents(),
     messages: getStoredMessages(),
@@ -131,6 +230,7 @@ export function restoreBackupData(jsonString: string): boolean {
     if (data.messages) saveStoredMessages(data.messages);
     if (data.routines) saveStoredRoutines(data.routines);
     if (data.files) saveStoredFiles(data.files);
+    if (data.settings) saveStoredSettings(data.settings);
     return true;
   } catch {
     return false;

@@ -13,7 +13,7 @@ import {
 import { Agent, ScheduledRoutine } from '../types';
 
 interface WhiteGlassRightPanelProps {
-  agent: Agent;
+  agent?: Agent;
   routines: ScheduledRoutine[];
   onToggleRoutine: (routineId: string) => void;
   onTriggerRoutineNow: (routineId: string) => void;
@@ -77,7 +77,7 @@ export const WhiteGlassRightPanel: React.FC<WhiteGlassRightPanelProps> = ({
           </div>
 
           <div className="text-center text-[11px] font-medium text-zinc-500">
-            {agent.name}'s screen
+            {agent?.name ? `${agent.name}'s screen` : 'Workspace Screen'}
           </div>
         </div>
 

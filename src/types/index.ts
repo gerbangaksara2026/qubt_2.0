@@ -5,6 +5,11 @@ export type ModelId =
   | 'gpt-4o'
   | 'grok-3'
   | 'deepseek-r1'
+  | 'hermes-3'
+  | 'opencode'
+  | 'openrouter'
+  | '9router'
+  | 'custom-endpoint'
   | 'codex-cli'
   | 'llama-3.3-70b-local';
 
@@ -160,12 +165,39 @@ export interface BrowserTabState {
   pageContentSummary?: string;
 }
 
+export interface UserProfile {
+  name: string;
+  email: string;
+  role: string;
+  avatarUrl?: string;
+}
+
+export interface AiAccountConnection {
+  connected: boolean;
+  email?: string;
+  tier?: string;
+  token?: string;
+  connectedAt?: string;
+  avatar?: string;
+}
+
+export interface CustomModelConfig {
+  baseUrl: string;
+  modelName: string;
+  apiKey: string;
+  isActive: boolean;
+}
+
 export interface AppSettings {
   geminiApiKey: string;
   anthropicApiKey: string;
   openaiApiKey: string;
   grokApiKey: string;
   deepseekApiKey: string;
+  hermesApiKey?: string;
+  openCodeApiKey?: string;
+  openRouterApiKey?: string;
+  nineRouterApiKey?: string;
   composioApiKey: string;
   elevenLabsApiKey: string;
   defaultModel: ModelId;
@@ -173,4 +205,33 @@ export interface AppSettings {
   theme: 'white-glass' | 'dark';
   soundEffects: boolean;
   autoSpeakResponses: boolean;
+  // User Profile & Workspace
+  userProfile: UserProfile;
+  workspaceName: string;
+  themeAccent: 'sky' | 'violet' | 'emerald' | 'amber' | 'rose' | 'zinc';
+  glassFrosting: 'subtle' | 'standard' | 'frosted';
+  // Authorized AI Subscriptions (OAuth Sign-In)
+  aiAccounts: {
+    openai: AiAccountConnection;
+    anthropic: AiAccountConnection;
+    google: AiAccountConnection;
+    grok: AiAccountConnection;
+    deepseek: AiAccountConnection;
+    hermes: AiAccountConnection;
+    opencode: AiAccountConnection;
+    openrouter: AiAccountConnection;
+    ninerouter: AiAccountConnection;
+  };
+  // Custom Model Configuration (Base URL, AI Model, API Key)
+  customModel: CustomModelConfig;
+  customEndpoint?: string;
+  ollamaModel?: string;
+  multiAgent: {
+    enableDelegation: boolean;
+    maxHops: number;
+    autoSuggest: boolean;
+  };
+  vpsServerUrl?: string;
+  vpsWebhookUrl?: string;
 }
+

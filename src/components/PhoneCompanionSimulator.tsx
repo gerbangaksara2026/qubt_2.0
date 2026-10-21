@@ -13,12 +13,13 @@ import {
 } from 'lucide-react';
 import { Agent, Message } from '../types';
 import { AgentPebbleAvatar } from './AgentPebbleAvatar';
+import { MascotAvatar } from './MascotAvatar';
 
 interface PhoneCompanionSimulatorProps {
   isOpen: boolean;
   onClose: () => void;
   agents: Agent[];
-  activeAgent: Agent;
+  activeAgent?: Agent;
   messages: Message[];
   onSendMessage: (text: string) => void;
 }
@@ -79,11 +80,7 @@ export const PhoneCompanionSimulator: React.FC<PhoneCompanionSimulatorProps> = (
                 {/* Mobile Header matching screenshot */}
                 <div className="px-4 py-2 flex items-center justify-between border-b border-zinc-100">
                   <div className="flex items-center gap-2">
-                    <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces"
-                      alt="Alex Chen"
-                      className="w-7 h-7 rounded-full object-cover border border-zinc-200"
-                    />
+                    <MascotAvatar size="xs" animate />
                     <span className="text-xs font-bold text-zinc-900">QUBOT</span>
                   </div>
 

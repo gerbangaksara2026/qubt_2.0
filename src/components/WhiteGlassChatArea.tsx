@@ -3,30 +3,26 @@ import {
   Send, 
   Plus, 
   Mic, 
-  MicOff, 
+  Trash2, 
   FileText, 
   ArrowUpRight, 
-  Sliders, 
-  ChevronDown, 
   Volume2, 
   VolumeX, 
-  Share2, 
-  X, 
+  Terminal, 
+  RotateCcw,
   Sparkles,
-  Terminal,
-  Clock,
-  Pause,
-  Play,
-  RotateCcw
+  Bot
 } from 'lucide-react';
-import { Agent, EnvironmentType, Message, ModelId, ApprovalPolicy } from '../types';
+import { Agent, AppSettings, Message, ModelId } from '../types';
 import { AgentPebbleAvatar } from './AgentPebbleAvatar';
 import { ApprovalCard } from './ApprovalCard';
+import { MascotAvatar } from './MascotAvatar';
 
 interface WhiteGlassChatAreaProps {
-  agent: Agent;
+  agent?: Agent;
   allAgents: Agent[];
   messages: Message[];
+  settings?: AppSettings;
   onSendMessage: (text: string) => void;
   onApproveToolCall: (toolCallId: string) => void;
   onRejectToolCall: (toolCallId: string) => void;
@@ -36,12 +32,15 @@ interface WhiteGlassChatAreaProps {
   onToggleWorkspace: () => void;
   isWorkspaceOpen: boolean;
   onClearHistory: () => void;
+  onDeleteAgent?: (agentId: string) => void;
+  onOpenNewAgentModal?: () => void;
 }
 
 export const WhiteGlassChatArea: React.FC<WhiteGlassChatAreaProps> = ({
   agent,
   allAgents,
   messages,
+  settings,
   onSendMessage,
   onApproveToolCall,
   onRejectToolCall,
@@ -50,110 +49,128 @@ export const WhiteGlassChatArea: React.FC<WhiteGlassChatAreaProps> = ({
   onOpenBotProfile,
   onToggleWorkspace,
   isWorkspaceOpen,
-  onClearHistory
+  onClearHistory,
+  onDeleteAgent,
+  onOpenNewAgentModal
 }) => {
   const [inputText, setInputText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [cursorPosition, setCursorPosition] = useState<number>(0);
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
-  const [showMentionPopup, setShowMentionPopup] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  if (!agent) {
+    return (
+      <main className="flex-1 flex flex-col h-full bg-white/40 backdrop-blur-md relative overflow-hidden select-none items-center justify-center p-8 text-center">
+        <div className="max-w-md w-full p-8 rounded-3xl bg-white/80 border border-zinc-200/80 shadow-xl backdrop-blur-xl space-y-4">
+          <div className="flex justify-center">
+            <MascotAvatar size="xl" animate glow />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-zinc-900 font-sans tracking-tight">
+              Welcome to QUBOT
+            </h2>
+            <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+              Your autonomous multi-model agent assistant. No bots are currently in your workspace.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-zinc-50 border border-zinc-200 text-left text-xs text-zinc-600 space-y-2">
+            <div className="font-semibold text-zinc-800 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+              What you can do:
+            </div>
+            <ul className="list-disc pl-4 space-y-1 text-[11px] text-zinc-500">
+              <li>Create custom bots with animated QUBOT mascots and color tints</li>
+              <li>Connect OpenAI (ChatGPT Plus/Pro), Claude, Gemini, Grok, or DeepSeek</li>
+              <li>Enable inter-agent collaboration and subtask delegation with @mentions</li>
+              <li>Execute automated bash, browser, and Composio tool workflows</li>
+            </ul>
+          </div>
+
+          <div className="pt-2 flex justify-center">
+            <button
+              onClick={onOpenNewAgentModal}
+              className="px-5 py-2.5 rounded-2xl bg-black hover:bg-zinc-800 text-white font-semibold text-xs shadow-md transition-all cursor-pointer flex items-center gap-2 hover:scale-105 active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Your First Bot</span>
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Handle @mention dropdown
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    const pos = e.target.selectionStart || 0;
+    setInputText(val);
+    setCursorPosition(pos);
+
+    const textBeforeCursor = val.slice(0, pos);
+    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
+    if (lastAtIdx !== -1 && (lastAtIdx === 0 || textBeforeCursor[lastAtIdx - 1] === ' ')) {
+      const query = textBeforeCursor.slice(lastAtIdx + 1);
+      if (!query.includes(' ')) {
+        setMentionQuery(query);
+        return;
+      }
+    }
+    setMentionQuery(null);
+  };
+
+  const handleSelectMention = (otherAgent: Agent) => {
+    const textBeforeCursor = inputText.slice(0, cursorPosition);
+    const textAfterCursor = inputText.slice(cursorPosition);
+    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
+    if (lastAtIdx !== -1) {
+      const newText = textBeforeCursor.slice(0, lastAtIdx) + otherAgent.handle + ' ' + textAfterCursor;
+      setInputText(newText);
+    }
+    setMentionQuery(null);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setMentionQuery(null);
+    }
+  };
+
+  const mentionCandidates = allAgents.filter(a => 
+    a.id !== agent.id && 
+    (mentionQuery === '' || a.handle.toLowerCase().includes((mentionQuery || '').toLowerCase()) || a.name.toLowerCase().includes((mentionQuery || '').toLowerCase()))
+  );
+
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     onSendMessage(inputText.trim());
     setInputText('');
-    setShowMentionPopup(false);
+    setMentionQuery(null);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setInputText(val);
-
-    if (val.endsWith('@')) {
-      setShowMentionPopup(true);
-    } else if (!val.includes('@') || val.endsWith(' ')) {
-      setShowMentionPopup(false);
-    }
-  };
-
-  const handleSelectMention = (otherAgent: Agent) => {
-    setInputText(prev => prev.replace(/@\w*$/, `${otherAgent.handle} `));
-    setShowMentionPopup(false);
-  };
-
-  // Text-to-speech audio synthesis
-  const handlePlayAudio = (messageId: string, text: string) => {
-    if (playingMessageId === messageId) {
-      window.speechSynthesis.cancel();
-      setPlayingMessageId(null);
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    if ('speechSynthesis' in window) {
-      const cleanText = text.replace(/[*#`_]/g, '');
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.rate = 1.05;
-      utterance.onend = () => setPlayingMessageId(null);
-      utterance.onerror = () => setPlayingMessageId(null);
-      setPlayingMessageId(messageId);
-      window.speechSynthesis.speak(utterance);
-    }
-  };
-
-  // Voice recording toggle using Web Speech API
   const handleToggleVoiceRecord = () => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert('Speech recognition is not supported in this browser.');
-      return;
-    }
-
-    if (isRecording) {
-      setIsRecording(false);
-      return;
-    }
-
-    try {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-
-      recognition.onstart = () => setIsRecording(true);
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputText(prev => (prev ? `${prev} ${transcript}` : transcript));
+    if (!isRecording) {
+      setIsRecording(true);
+      setTimeout(() => {
         setIsRecording(false);
-      };
-      recognition.onerror = () => setIsRecording(false);
-      recognition.onend = () => setIsRecording(false);
-
-      recognition.start();
-    } catch {
+        setInputText(prev => prev + (prev ? ' ' : '') + 'Please summarize the action items and verify the CRM sync status.');
+      }, 2400);
+    } else {
       setIsRecording(false);
     }
   };
 
   return (
     <main className="flex-1 flex flex-col h-full bg-white/40 backdrop-blur-md relative overflow-hidden select-none">
-      {/* Top Header matching reference UI */}
+      {/* Top Header */}
       <header className="px-5 py-3 border-b border-zinc-200/60 bg-white/70 backdrop-blur-md flex items-center justify-between gap-4 select-none z-10">
         <div className="flex items-center gap-2.5">
           <button
@@ -187,7 +204,7 @@ export const WhiteGlassChatArea: React.FC<WhiteGlassChatAreaProps> = ({
           </select>
         </div>
 
-        <div className="flex items-center gap-2 text-zinc-400">
+        <div className="flex items-center gap-1.5 text-zinc-400">
           <button
             onClick={onToggleWorkspace}
             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
@@ -204,22 +221,35 @@ export const WhiteGlassChatArea: React.FC<WhiteGlassChatAreaProps> = ({
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
+
+          {/* Delete Bot Button */}
+          {onDeleteAgent && (
+            <button
+              onClick={() => {
+                if (confirm(`Are you sure you want to delete bot "${agent.name}"?`)) {
+                  onDeleteAgent(agent.id);
+                }
+              }}
+              className="p-1.5 rounded-lg hover:bg-red-50 text-zinc-400 hover:text-red-600 transition-colors cursor-pointer"
+              title="Delete Bot"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </header>
 
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 select-text">
-        {/* Centered Time Pill like screenshot */}
         <div className="flex justify-center my-1 select-none">
           <span className="text-[11px] font-medium text-zinc-400 bg-white/70 px-2.5 py-0.5 rounded-full border border-zinc-200/40 shadow-2xs">
-            9:41 AM
+            Session Active
           </span>
         </div>
 
         {messages.map((message) => {
           const isUser = message.sender === 'user';
           const isAgent = message.sender === 'agent';
-          const isPlayingThis = playingMessageId === message.id;
           const authorAgent = message.authorAgentId 
             ? allAgents.find(a => a.id === message.authorAgentId) 
             : (isAgent ? agent : null);
@@ -261,92 +291,77 @@ export const WhiteGlassChatArea: React.FC<WhiteGlassChatAreaProps> = ({
                         PDF
                       </div>
                       <div>
-                        <div className="text-xs font-semibold text-zinc-900 leading-snug">
-                          {message.attachment.name}
-                        </div>
+                        <div className="text-xs font-semibold">{message.attachment.name}</div>
                         <div className="text-[10px] text-zinc-400">
-                          {message.attachment.pages} pages • {message.attachment.size}
+                          {message.attachment.pages ? `${message.attachment.pages} pages • ` : ''}{message.attachment.size}
                         </div>
                       </div>
                     </div>
-                    <ArrowUpRight className="w-4 h-4 text-zinc-400" />
+                  </div>
+                )}
+
+                {/* Tool calls awaiting approval or executed */}
+                {message.toolCalls && message.toolCalls.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {message.toolCalls.map((toolCall) => (
+                      <ApprovalCard
+                        key={toolCall.id}
+                        toolCall={toolCall}
+                        onApprove={onApproveToolCall}
+                        onReject={onRejectToolCall}
+                        onModify={onModifyToolCall}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
 
-              {/* Message Footer */}
-              <div className="flex items-center gap-2 mt-1 px-1">
-                {isAgent && (
-                  <button
-                    onClick={() => handlePlayAudio(message.id, message.content)}
-                    className="text-[10px] text-zinc-400 hover:text-zinc-700 flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    {isPlayingThis ? <Pause className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                    <span>{isPlayingThis ? 'Playing' : 'Voice'}</span>
-                  </button>
-                )}
-                <span className="text-[10px] text-zinc-400 font-mono">
-                  {message.timestamp}
-                </span>
-              </div>
-
-              {/* Tool Calls & Approval Cards */}
-              {message.toolCalls && message.toolCalls.length > 0 && (
-                <div className="w-full space-y-2 mt-2">
-                  {message.toolCalls.map((toolCall) => (
-                    <ApprovalCard
-                      key={toolCall.id}
-                      toolCall={toolCall}
-                      onApprove={onApproveToolCall}
-                      onReject={onRejectToolCall}
-                      onModify={onModifyToolCall}
-                    />
-                  ))}
-                </div>
-              )}
+              {/* Timestamp */}
+              <span className="text-[10px] text-zinc-400 mt-1 px-1">
+                {message.timestamp}
+              </span>
             </div>
           );
         })}
-
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Mention Auto-Suggest Popup */}
-      {showMentionPopup && (
-        <div className="absolute bottom-20 left-6 z-30 w-72 bg-white border border-zinc-200 rounded-2xl shadow-xl p-2 space-y-1">
-          <div className="text-[10px] font-mono uppercase text-zinc-400 px-2 py-1">
-            Delegate Task to Another Agent (@mention)
+      {/* Floating @mention suggestion dropdown */}
+      {mentionQuery !== null && mentionCandidates.length > 0 && (
+        <div className="absolute bottom-20 left-6 right-6 md:left-8 md:max-w-md bg-white/95 backdrop-blur-xl border border-zinc-200 rounded-2xl shadow-xl p-2 z-30">
+          <div className="px-2 py-1 text-[10px] font-mono font-semibold text-zinc-400 uppercase tracking-wider">
+            Mention bot to delegate task:
           </div>
-          {allAgents.filter(a => a.id !== agent.id).map(other => (
-            <button
-              key={other.id}
-              onClick={() => handleSelectMention(other)}
-              className="w-full p-2 rounded-xl hover:bg-zinc-100 flex items-center gap-2.5 text-left cursor-pointer transition-colors"
-            >
-              <AgentPebbleAvatar agent={other} size="sm" />
-              <div className="truncate flex-1">
-                <div className="text-xs font-semibold text-zinc-900 truncate">{other.name}</div>
-                <div className="text-[10px] text-zinc-500 font-mono truncate">{other.handle} • {other.role}</div>
-              </div>
-            </button>
-          ))}
+          <div className="space-y-1 max-h-48 overflow-y-auto">
+            {mentionCandidates.map(cand => (
+              <button
+                key={cand.id}
+                type="button"
+                onClick={() => handleSelectMention(cand)}
+                className="w-full p-2 rounded-xl hover:bg-zinc-100 flex items-center gap-2.5 text-left transition-colors cursor-pointer"
+              >
+                <AgentPebbleAvatar agent={cand} size="xs" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-zinc-800 truncate">{cand.name}</div>
+                  <div className="text-[10px] text-zinc-500 font-mono truncate">{cand.handle} • {cand.role}</div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Bottom Input Bar - Exactly matching reference UI */}
-      <div className="p-4 bg-transparent select-none">
-        <form 
-          onSubmit={handleSubmit}
-          className="bg-white/95 backdrop-blur-md rounded-2xl border border-zinc-200/90 shadow-sm p-1.5 pl-3 flex items-center gap-2.5 transition-all focus-within:ring-2 focus-within:ring-zinc-900/10 focus-within:border-zinc-300"
+      {/* Bottom Message Input Bar */}
+      <div className="p-4 bg-white/60 backdrop-blur-md border-t border-zinc-200/50">
+        <form
+          onSubmit={handleFormSubmit}
+          className="flex items-center gap-2 bg-white/90 border border-zinc-200/90 rounded-2xl px-3 py-2 shadow-xs focus-within:border-zinc-400 transition-all"
         >
-          {/* Plus action icon */}
+          {/* Circular Plus Button */}
           <button
             type="button"
-            onClick={() => {
-              setInputText(prev => prev ? `${prev} @` : '@');
-              setShowMentionPopup(true);
-            }}
-            className="w-6 h-6 rounded-full hover:bg-zinc-100 text-zinc-400 hover:text-zinc-800 flex items-center justify-center transition-colors cursor-pointer"
+            onClick={() => setInputText(prev => prev + '@')}
+            className="w-7 h-7 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center transition-colors cursor-pointer"
             title="Attach or Mention"
           >
             <Plus className="w-4 h-4" />
@@ -358,11 +373,11 @@ export const WhiteGlassChatArea: React.FC<WhiteGlassChatAreaProps> = ({
             value={inputText}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={`Message ${agent.name}`}
+            placeholder={`Message ${agent.name} (type @ to delegate to another bot)`}
             className="flex-1 bg-transparent border-none outline-none text-xs text-zinc-900 placeholder-zinc-400"
           />
 
-          {/* Black Circular Voice Microphone / Send Button matching screenshot */}
+          {/* Circular Voice Microphone / Send Button */}
           {inputText.trim() ? (
             <button
               type="submit"

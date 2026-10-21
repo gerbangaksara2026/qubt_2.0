@@ -95,7 +95,7 @@ export default function QubotDashboard() {
 
   // Save changes to storage
   useEffect(() => {
-    if (agents.length > 0) saveStoredAgents(agents);
+    saveStoredAgents(agents);
   }, [agents]);
 
   useEffect(() => {
@@ -113,6 +113,36 @@ export default function QubotDashboard() {
   // Active agent reference
   const currentAgent = agents.find(a => a.id === activeAgentId) || agents[0];
   const currentMessages = currentAgent ? (messages[currentAgent.id] || []) : [];
+
+  // Delete single bot handler
+  const handleDeleteAgent = (agentId: string) => {
+    const updated = agents.filter(a => a.id !== agentId);
+    setAgents(updated);
+    saveStoredAgents(updated);
+
+    setMessages(prev => {
+      const copy = { ...prev };
+      delete copy[agentId];
+      saveStoredMessages(copy);
+      return copy;
+    });
+
+    if (activeAgentId === agentId) {
+      const nextActive = updated[0]?.id || '';
+      setActiveAgentId(nextActive);
+      setIsBotProfileOpen(false);
+    }
+  };
+
+  // Clear all bots handler for clean workspace
+  const handleClearAllBots = () => {
+    setAgents([]);
+    saveStoredAgents([]);
+    setMessages({});
+    saveStoredMessages({});
+    setActiveAgentId('');
+    setIsBotProfileOpen(false);
+  };
 
   // Count total pending approval actions across all agents
   const pendingApprovalsCount = Object.values(messages).reduce((acc, msgList) => {
@@ -460,10 +490,6 @@ export default function QubotDashboard() {
     saveStoredSettings(newSettings);
   };
 
-  if (!currentAgent) {
-    return <div className="h-screen bg-slate-50 flex items-center justify-center text-zinc-500">Loading QUBOT...</div>;
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-tr from-sky-100 via-slate-50 to-indigo-100/60 p-2 sm:p-4 md:p-6 flex items-center justify-center font-sans antialiased">
       {/* Floating macOS Glassmorphic Window Container exactly matching reference screenshot */}
@@ -472,12 +498,14 @@ export default function QubotDashboard() {
         <WhiteGlassSidebar
           agents={agents}
           activeAgentId={activeAgentId}
+          settings={settings}
           onSelectAgent={setActiveAgentId}
           onOpenNewAgentModal={() => setIsAgentModalOpen(true)}
           onOpenRoutinesModal={() => setIsRoutinesModalOpen(true)}
           onOpenSettingsModal={() => setIsSettingsModalOpen(true)}
           onOpenOrgLibraryModal={() => setIsOrgLibraryOpen(true)}
           onOpenPhonePairingModal={() => setIsPhoneSimulatorOpen(true)}
+          onDeleteAgent={handleDeleteAgent}
           pendingApprovalsCount={pendingApprovalsCount}
         />
 
@@ -486,6 +514,7 @@ export default function QubotDashboard() {
           agent={currentAgent}
           allAgents={agents}
           messages={currentMessages}
+          settings={settings}
           onSendMessage={handleSendMessage}
           onApproveToolCall={handleApproveToolCall}
           onRejectToolCall={handleRejectToolCall}
@@ -495,6 +524,8 @@ export default function QubotDashboard() {
           onToggleWorkspace={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
           isWorkspaceOpen={isWorkspaceOpen}
           onClearHistory={handleClearHistory}
+          onDeleteAgent={handleDeleteAgent}
+          onOpenNewAgentModal={() => setIsAgentModalOpen(true)}
         />
 
         {/* Right Column: Screen Preview & Routines Panel */}
@@ -570,17 +601,21 @@ export default function QubotDashboard() {
         onClose={() => setIsSettingsModalOpen(false)}
         settings={settings}
         onSaveSettings={handleSaveSettings}
+        onClearAllBots={handleClearAllBots}
       />
 
       {/* Bot Profile & Mascot Color Drawer */}
-      <BotProfileDrawer
-        isOpen={isBotProfileOpen}
-        onClose={() => setIsBotProfileOpen(false)}
-        agent={currentAgent}
-        onUpdateAgent={(updatedAgent) => {
-          setAgents(prev => prev.map(a => a.id === updatedAgent.id ? updatedAgent : a));
-        }}
-      />
+      {currentAgent && (
+        <BotProfileDrawer
+          isOpen={isBotProfileOpen}
+          onClose={() => setIsBotProfileOpen(false)}
+          agent={currentAgent}
+          onUpdateAgent={(updatedAgent) => {
+            setAgents(prev => prev.map(a => a.id === updatedAgent.id ? updatedAgent : a));
+          }}
+          onDeleteAgent={handleDeleteAgent}
+        />
+      )}
     </div>
   );
 }

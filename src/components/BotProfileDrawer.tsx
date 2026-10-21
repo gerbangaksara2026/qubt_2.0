@@ -20,13 +20,15 @@ interface BotProfileDrawerProps {
   onClose: () => void;
   agent: Agent;
   onUpdateAgent: (updatedAgent: Agent) => void;
+  onDeleteAgent?: (agentId: string) => void;
 }
 
 export const BotProfileDrawer: React.FC<BotProfileDrawerProps> = ({
   isOpen,
   onClose,
   agent,
-  onUpdateAgent
+  onUpdateAgent,
+  onDeleteAgent
 }) => {
   const [activeTab, setActiveTab] = useState<'avatar' | 'memory' | 'model' | 'tools'>('avatar');
   const [mascotColor, setMascotColor] = useState<MascotColorPreset>(agent.mascotColor || 'purple');
@@ -414,24 +416,70 @@ export const BotProfileDrawer: React.FC<BotProfileDrawerProps> = ({
                   <span>Download .qubot.json</span>
                 </button>
               </div>
+
+              {/* Danger Zone: Delete Bot */}
+              {onDeleteAgent && (
+                <div className="p-3.5 rounded-2xl bg-red-50/70 border border-red-200 space-y-2 mt-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-red-900 text-xs flex items-center gap-1.5">
+                        <Trash2 className="w-3.5 h-3.5 text-red-600" /> Delete Bot
+                      </h4>
+                      <p className="text-[11px] text-red-600 mt-0.5">
+                        Permanently remove "{agent.name}" and delete all conversation history with this bot.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Are you sure you want to permanently delete bot "${agent.name}"?`)) {
+                          onDeleteAgent(agent.id);
+                          onClose();
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs transition-colors cursor-pointer shadow-xs whitespace-nowrap"
+                    >
+                      Delete Bot
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-zinc-200 bg-zinc-50/70 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-zinc-600 hover:text-zinc-900 font-medium cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-5 py-2 rounded-xl bg-black hover:bg-zinc-800 text-white font-semibold cursor-pointer shadow-sm"
-          >
-            Apply Changes
-          </button>
+        <div className="px-6 py-3 border-t border-zinc-200 bg-zinc-50/70 flex items-center justify-between">
+          {onDeleteAgent ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (confirm(`Are you sure you want to permanently delete bot "${agent.name}"?`)) {
+                  onDeleteAgent(agent.id);
+                  onClose();
+                }
+              }}
+              className="px-3 py-1.5 rounded-xl text-red-600 hover:bg-red-50 border border-red-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Bot</span>
+            </button>
+          ) : <div />}
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded-xl text-zinc-600 hover:text-zinc-900 font-medium cursor-pointer text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-5 py-2 rounded-xl bg-black hover:bg-zinc-800 text-white font-semibold cursor-pointer shadow-sm text-xs"
+            >
+              Apply Changes
+            </button>
+          </div>
         </div>
       </div>
     </div>
