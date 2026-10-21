@@ -1,0 +1,6 @@
+{
+  "name": "QUBOT - Automation Assistant for Everything",
+  "description": "A local-first, multi-agent automation assistant where each contact is an AI bot equipped with its own memory, tools, computer environments, and human-in-the-loop approvals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
